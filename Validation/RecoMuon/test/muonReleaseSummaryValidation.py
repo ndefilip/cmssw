@@ -38,7 +38,12 @@ def GetLabel(params):
         label = 'START'
     elif (params['Condition']=='MC'):
         label ='MC_52_V1'
-    label+=params['Label']
+    
+    if (params['Condition'] != 'PRE_LS1'):   
+        label+= '_' + params['Label']
+    else :
+        label+=params['Label']
+    
     if (params['FastSim']):
         label += '_FastSim'
 
@@ -148,7 +153,7 @@ def getSampleFiles(params, sample):
     elif (userparams.NewParams['GetFilesFrom']=='GUI'):
         theGuiSample = sample
         
-        if (params['Condition'].find('PRE_LS1')!=-1 or params['Condition'].find('POSTLS1')!=-1):
+        if (params['Condition'].find('PRE_LS1')!=-1 or params['Condition'].find('MCRUN2')!=-1):
             if (userparams.NewParams['FastSim']| userparams.RefParams['FastSim']):
                 if ((sample=="RelValTTbar")|(sample=="RelValJpsiMM")|(sample=="RelValZMM")):
                     #theGuiPostFixLS1 = "_UPGpostls1_14"                                                                                                                               

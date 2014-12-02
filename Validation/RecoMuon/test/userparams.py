@@ -18,7 +18,7 @@ Submit=True
 #
 # Should we publish the results?
 #
-Publish=False
+Publish=True
 
 # + Location of the AFS place where to put the PDFs
 WebRepository = '/afs/cern.ch/cms/Physics/muon/CMSSW/Performance/RecoMuon/Validation/val'
@@ -34,11 +34,11 @@ NewParams = dict(
     Type='New',
     
     # Releases to compare
-    Release='CMSSW_7_2_0',
+    Release='CMSSW_7_2_2_patch1',
 
     # Conditions of the sample: MC, STARTUP, POSTLS1...
     # Condition='POSTLS1',
-    Condition='PRE_LS1',
+    Condition='MCRUN2',
 
     # 'no' if no pileup, otherwise set spacing
     PileUp='50ns',
@@ -67,14 +67,14 @@ NewParams = dict(
     # These are only needed if you copy any root file from the DQM GUI.
     # See GetLabel function for more details
     #Label='70_V6_corrHARV',
-    Label='72_V16',
+    Label='72_V0',
 
     # ???
     Format='DQMIO',
     #Format='GEN-SIM-RECO',
 
     # Minor Version
-    Version='v2'
+    Version='v1'
 )
 
 
@@ -85,10 +85,10 @@ NewParams = dict(
 RefParams = dict(
     Condition='PRE_LS1',
     Type='Ref',
-    Release='CMSSW_7_2_0_pre8',
+    Release='CMSSW_7_2_0',
     #Label='70_V6_AlcaCSA14',
     Label='72_V16',
-    Version='v1'
+    Version='v2'
 )
 
 #
@@ -102,7 +102,7 @@ ValidateDQM  = True
 # Samples for Validation
 
 # For No PU
-# samples= ['RelValSingleMuPt10','RelValSingleMuPt100','RelValSingleMuPt1000','RelValTTbar','RelValZMM','RelValJpsiMM','RelValZpMM_2250_13TeV_Tauola']
+# samples= ['RelValSingleMuPt1','RelValSingleMuPt10','RelValSingleMuPt100','RelValSingleMuPt1000','RelValTTbar','RelValZMM','RelValJpsiMM','RelValZpMM_2250_13TeV_Tauola']
 
 # For PU 25 ns and 50 ns
 samples= ['RelValTTbar','RelValZMM','RelValZmumuJets_Pt_20_300']
