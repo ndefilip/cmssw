@@ -371,5 +371,6 @@ for sample in userparams.samples :
             # os.makedirs(newdir)
         # os.system('rm '+ newlocalsample)  
         # os.system('scp -r '+newpath+'/* ' + newdir)
-        os.system('scp -r '+newpath+'/* '+userparams.User+'@lxplus.cern.ch:' + newdir)    
-        print('Newpath is' + newlocalsample + ' and ' + newpath)
+        os.system('scp -r '+newpath+'/* '+userparams.User+'@lxplus.cern.ch:' + newdir)
+        os.system('ssh '+userparams.User+'@lxplus.cern.ch rm -f ' + newdir + '/*.root')
+        print('Newpath is ' + newlocalsample + ' and ' + newpath)
