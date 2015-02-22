@@ -14,6 +14,7 @@
 #include "TPad.h"
 #include "TPaveLabel.h"
 #include <vector>
+#include "MuonStyle.C"
 
 /////
 // Uncomment the following line to get more debuggin output
@@ -27,16 +28,44 @@
 //       things can be further simplified
 //
 void SetGlobalStyle() {
-  gROOT->SetStyle("Plain");
-  gStyle->SetPadGridX(kTRUE);
-  gStyle->SetPadGridY(kTRUE);
-  gStyle->SetPadRightMargin(0.07);
-  gStyle->SetPadLeftMargin(0.13);
-  //gStyle->SetTitleXSize(0.07); 
+
+   //
+  
+  TStyle * style = getStyle("Muon");
+  //style->SetMarkerSize(0.8);
+  style->cd();
+  style->SetNdivisions(508, "X");
+  style->SetMarkerSize(0.8);
+  style->SetPadGridX(kTRUE);
+  style->SetPadGridY(kTRUE);  
+  style->SetGridStyle(3);
+  style->SetGridWidth(1);
+  style->SetOptTitle(2);
+  style->SetTitleFont(42);
+  style->SetTitleColor(1);
+  style->SetTitleTextColor(1);
+  style->SetTitleFillColor(10);
+  style->SetTitleFontSize(0.04);
+  style->SetPadRightMargin(0.07);
+  style->SetPadLeftMargin(0.13);
+  style->SetTitleXSize(0.07);
+  style->SetTitleXOffset(0.6);
+  style->SetTitleYSize(0.3);
+  style->SetTitleY(0.99);
+
+  //
+
+
+  // gROOT->SetStyle("Plain");
+  // gStyle->SetPadGridX(kTRUE);
+  // gStyle->SetPadGridY(kTRUE);
+  // gStyle->SetPadRightMargin(0.07);
+  // gStyle->SetPadLeftMargin(0.13);
+  ////gStyle->SetTitleXSize(0.07); 
   //gStyle->SetTitleXOffset(0.6); 
-  //tyle->SetTitleYSize(0.3);
-  //gStyle->SetLabelSize(0.6) 
-  //gStyle->SetTextSize(0.5);
+  ////gStyle->SetTitleYSize(0.3);
+  ////gStyle->SetLabelSize(0.6) 
+  ////gStyle->SetTextSize(0.5);
 }
 //
 ////////////////////////////////////////////////////////////
@@ -415,11 +444,13 @@ void PlotNHistograms(const TString& pdfFile,
 
 
     // Normalize
-    if (norm == -1.)
+    cout << "Norm= "<< *norm << endl; 
+    if (*norm == -1.)
       NormalizeHistogramsTo1(rh, sh);
-    else if (norm == 0.)
+    else if (*norm == 0.){ 
       NormalizeHistogramsToFirst(rh,sh);
-    else if (norm == -999.){
+      }
+    else if (*norm == -999.){
       cout << "DEBUG: Normalizing histograms to nothing" << "..." << endl;
     }
     /*    else {
@@ -555,6 +586,7 @@ void Plot4Histograms(const TString& pdfFile,
 		     bool* logy = 0, bool* doKolmo = 0, Double_t* norm = 0,bool *resol = 0,
 		     Double_t* minx = 0, Double_t* maxx = 0,
 		     Double_t* miny = 0, Double_t* maxy = 0) {
+  //cout << "Norm= " << *norm << endl;
   PlotNHistograms(pdfFile,
 		  rdir, sdir,
 		  rcollname, scollname,
@@ -626,9 +658,11 @@ void Plot5Histograms(const TString& pdfFile,
 //
 void NormalizeHistogramsToFirst(TH1* h1, TH1* h2) {
   if (h1==0 || h2==0) return;
-  
+  //cout << h1->Integral() << " " << h2->Integral() << endl;
   if ( h1->Integral() > 0 && h2->Integral() > 0 ){
-    Double_t scale2 = h1->Integral()/h2->Integral();
+    cout << h1->Integral() << " " << h2->Integral() << endl;
+    cout << h1->Integral(0,-1) << " " << h2->Integral(0,-1) << endl;
+    Double_t scale2 = double(h1->Integral(0,-1)/h2->Integral(0,-1));
     h2->Scale(scale2);
   }
 }

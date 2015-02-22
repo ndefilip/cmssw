@@ -94,7 +94,7 @@ void IsoValHistoPublisher(char* newFile="NEW_FILE",char* refFile="REF_FILE") {
     
     bool    logy    [] = {false,   false,  false,      false    };
     bool    doKolmo [] = {true,    true,   true,       true     };
-    Double_t norm   [] = {0.,0.,0.,0.};
+    Double_t norm   [] = {-999.,-999.,-999.,-999.};
     //===== Tracker, ECAL Deposits
     const char* plots1  [] = {"sumPt", "emEt", "sumPt_cd", "emEt_cd"};
     Plot4Histograms(newDir + "/muonIso1.pdf",
