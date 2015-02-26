@@ -440,25 +440,27 @@ void PlotNHistograms(const TString& pdfFile,
       sh = proj;
     }
 
-    if(TString(sh->GetName()).Contains(" vs "))norm= -999.;
+    if(TString(sh->GetName()).Contains(" vs "))norm[i]= -999.;
 
 
     // Normalize
-    cout << "Norm= "<< *norm << endl; 
-    if (*norm == -1.)
+#ifdef DEBUG
+    cout << "Normalizing to = "<< norm[i] << endl; 
+#endif
+    if (norm[i] == -1.)
       NormalizeHistogramsTo1(rh, sh);
-    else if (*norm == 0.){ 
+    else if (norm[i] == 0.){ 
       NormalizeHistogramsToFirst(rh,sh);
       }
-    else if (*norm == -999.){
+    else if (norm[i] == -999.){
       cout << "DEBUG: Normalizing histograms to nothing" << "..." << endl;
     }
     /*    else {
 #ifdef DEBUG
-      cout << "DEBUG: Normalizing histograms to " << norm << "..." << endl;
+      cout << "DEBUG: Normalizing histograms to " << norm[i] << "..." << endl;
 #endif
-      sh->Scale(norm);
-      rh->Scale(norm);
+      sh->Scale(norm[i]);
+      rh->Scale(norm[i]);
       }*/
 
 
@@ -660,8 +662,8 @@ void NormalizeHistogramsToFirst(TH1* h1, TH1* h2) {
   if (h1==0 || h2==0) return;
   //cout << h1->Integral() << " " << h2->Integral() << endl;
   if ( h1->Integral() > 0 && h2->Integral() > 0 ){
-    cout << h1->Integral() << " " << h2->Integral() << endl;
-    cout << h1->Integral(0,-1) << " " << h2->Integral(0,-1) << endl;
+    //cout << h1->Integral() << " " << h2->Integral() << endl;
+    //cout << h1->Integral(0,-1) << " " << h2->Integral(0,-1) << endl;
     Double_t scale2 = double(h1->Integral(0,-1)/h2->Integral(0,-1));
     h2->Scale(scale2);
   }
