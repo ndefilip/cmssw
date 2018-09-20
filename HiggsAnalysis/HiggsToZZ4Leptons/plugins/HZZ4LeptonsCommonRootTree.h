@@ -25,6 +25,16 @@
 #include "SimGeneral/HepPDTRecord/interface/ParticleDataTable.h"
 #include "SimDataFormats/GeneratorProducts/interface/GenEventInfoProduct.h"
 
+//@
+//To retrieve LHE info
+#include "SimDataFormats/GeneratorProducts/interface/LHEEventProduct.h"
+#include "SimDataFormats/GeneratorProducts/interface/LHERunInfoProduct.h"
+//To retrieve JEC Uncertainty
+#include "JetMETCorrections/Objects/interface/JetCorrector.h"
+#include "JetMETCorrections/Objects/interface/JetCorrectionsRecord.h"
+#include "CondFormats/JetMETObjects/interface/JetCorrectorParameters.h"
+#include "CondFormats/JetMETObjects/interface/JetCorrectionUncertainty.h"
+
 // Data format
 #include "DataFormats/Common/interface/Handle.h" 
 #include "DataFormats/MuonReco/interface/Muon.h"
@@ -118,7 +128,11 @@
 #include "MagneticField/Records/interface/IdealMagneticFieldRecord.h"
 #include "RecoParticleFlow/PFClusterTools/interface/PFEnergyResolution.h"
 
+// KAMuon Calibrator
+#include "KaMuCa/Calibration/interface/KalmanMuonCalibrator.h"
+
 #include <TMatrixD.h>
+#include <TLorentzVector.h>
 
 //chisquare
 #include "CommonTools/Statistics/interface/ChiSquaredProbability.h"
@@ -177,6 +191,10 @@ class HZZ4LeptonsCommonRootTree : public edm::EDAnalyzer {
     // Generator
     generator_                = consumes<GenEventInfoProduct>(pset.getParameter<edm::InputTag>("Generator"));
 
+    //@
+    //LHEProduct = cms.InputTag("externalLHEProducer") needs to added to HiggsAnalysis/HiggsToZZ4Leptons/python/hTozzTo4leptonsCommonRootTree_cfi.py
+    LHE_                      = consumes<LHEEventProduct>(pset.getParameter<edm::InputTag> ("LHEProduct"));
+    
     // Get HLT flags
     fillHLTinfo               = pset.getUntrackedParameter<bool>("fillHLTinfo");
     HLTInfoFired              = pset.getParameter<edm::InputTag>("HLTInfoFired");
@@ -240,7 +258,9 @@ class HZZ4LeptonsCommonRootTree : public edm::EDAnalyzer {
  
     muonTag_                  = consumes<edm::View<pat::Muon> >(pset.getParameter<edm::InputTag>("MuonsLabel"));
     muonCorrPtErrorMapTag_    = consumes<edm::ValueMap<float> >(pset.getParameter<edm::InputTag>("MuonsCorrPtErrorMapLabel"));
-    
+    //@
+    isData                    = pset.getParameter<bool>("isData");
+    slimmedMuonsTag_          = consumes<edm::View<pat::Muon> >(pset.getParameter<edm::InputTag>("SlimmedMuonsLabel"));
     muonPFTag_                  = consumes<edm::View<pat::Muon> >(pset.getParameter<edm::InputTag>("PFMuonsLabel"));
 /*
     muonPFIsoValueChargedAllTag_= consumes<edm::ValueMap<double> >(pset.getParameter<edm::InputTag>("MuonPFIsoValueChargedAll"));
@@ -1150,6 +1170,50 @@ class HZZ4LeptonsCommonRootTree : public edm::EDAnalyzer {
     Tree_->Branch( "RECO_PFJET_PUID_MVA", RECO_PFJET_PUID_MVA, "RECO_PFJET_PUID_MVA[200]/F");
     Tree_->Branch( "RHO_ele", &RHO_ele, "RHO_ele/D");
     Tree_->Branch( "RHO_mu", &RHO_mu, "RHO_mu/D");
+    // LHE
+    Tree_->Branch("LHE_PARTON_N", &LHE_PARTON_N, "LHE_PARTON_N/I");
+    Tree_->Branch("LHE_PARTON_CLEAR", LHE_PARTON_CLEAR, "LHE_PARTON_CLEAR[10]/b");
+    Tree_->Branch("LHE_PARTON_PDGID", LHE_PARTON_PDGID, "LHE_PARTON_PDGID[10]/I");
+    Tree_->Branch("LHE_PARTON_PT", LHE_PARTON_PT, "LHE_PARTON_PT[10]/F");
+    Tree_->Branch("LHE_PARTON_ETA", LHE_PARTON_ETA, "LHE_PARTON_ETA[10]/F");
+    Tree_->Branch("LHE_PARTON_PHI", LHE_PARTON_PHI, "LHE_PARTON_PHI[10]/F");
+    Tree_->Branch("LHE_PARTON_E", LHE_PARTON_E, "LHE_PARTON_E[10]/F");
+    //@
+    Tree_->Branch("RECO_PFJET_PT_UncUp", RECO_PFJET_PT_UncUp, "RECO_PFJET_PT_UncUp[200]/F");
+    Tree_->Branch("RECO_PFJET_PT_UncDn", RECO_PFJET_PT_UncDn, "RECO_PFJET_PT_UncDn[200]/F");
+    Tree_->Branch("RECO_PFJET_AREA", RECO_PFJET_AREA, "RECO_PFJET_AREA[200]/F");
+    Tree_->Branch("RECO_PFJET_PTD", RECO_PFJET_PTD, "RECO_PFJET_PTD[200]/F");
+    Tree_->Branch("RECO_PFJET_CHARGED_HADRON_ENERGY", RECO_PFJET_CHARGED_HADRON_ENERGY, "RECO_PFJET_CHARGED_HADRON_ENERGY[200]/F");
+    Tree_->Branch("RECO_PFJET_NEUTRAL_HADRON_ENERGY", RECO_PFJET_NEUTRAL_HADRON_ENERGY, "RECO_PFJET_NEUTRAL_HADRON_ENERGY[200]/F");
+    Tree_->Branch("RECO_PFJET_PHOTON_ENERGY", RECO_PFJET_PHOTON_ENERGY, "RECO_PFJET_PHOTON_ENERGY[200]/F");
+    Tree_->Branch("RECO_PFJET_ELECTRON_ENERGY", RECO_PFJET_ELECTRON_ENERGY, "RECO_PFJET_ELECTRON_ENERGY[200]/F");
+    Tree_->Branch("RECO_PFJET_MUON_ENERGY", RECO_PFJET_MUON_ENERGY, "RECO_PFJET_MUON_ENERGY[200]/F");
+    Tree_->Branch("RECO_PFJET_HF_HADRON_ENERGY", RECO_PFJET_HF_HADRON_ENERGY, "RECO_PFJET_HF_HADRON_ENERGY[200]/F");
+    Tree_->Branch("RECO_PFJET_HF_EM_ENERGY", RECO_PFJET_HF_EM_ENERGY, "RECO_PFJET_HF_EM_ENERGY[200]/F");
+    Tree_->Branch("RECO_PFJET_CHARGED_EM_ENERGY", RECO_PFJET_CHARGED_EM_ENERGY, "RECO_PFJET_CHARGED_EM_ENERGY[200]/F");
+    Tree_->Branch("RECO_PFJET_CHARGED_MU_ENERGY", RECO_PFJET_CHARGED_MU_ENERGY, "RECO_PFJET_CHARGED_MU_ENERGY[200]/F");
+    Tree_->Branch("RECO_PFJET_NEUTRAL_EM_ENERGY", RECO_PFJET_NEUTRAL_EM_ENERGY, "RECO_PFJET_NEUTRAL_EM_ENERGY[200]/F");
+    Tree_->Branch("RECO_PFJET_CHARGED_HADRON_MULTIPLICITY", RECO_PFJET_CHARGED_HADRON_MULTIPLICITY, "RECO_PFJET_CHARGED_HADRON_MULTIPLICITY[200]/I");
+    Tree_->Branch("RECO_PFJET_NEUTRAL_HADRON_MULTIPLICITY", RECO_PFJET_NEUTRAL_HADRON_MULTIPLICITY, "RECO_PFJET_NEUTRAL_HADRON_MULTIPLICITY[200]/I");
+    Tree_->Branch("RECO_PFJET_PHOTON_MULTIPLICITY", RECO_PFJET_PHOTON_MULTIPLICITY, "RECO_PFJET_PHOTON_MULTIPLICITY[200]/I");
+    Tree_->Branch("RECO_PFJET_ELECTRON_MULTIPLICITY", RECO_PFJET_ELECTRON_MULTIPLICITY, "RECO_PFJET_ELECTRON_MULTIPLICITY[200]/I");
+    Tree_->Branch("RECO_PFJET_MUON_MULTIPLICITY", RECO_PFJET_MUON_MULTIPLICITY, "RECO_PFJET_MUON_MULTIPLICITY[200]/I");
+    Tree_->Branch("RECO_PFJET_HF_HADRON_MULTIPLICTY", RECO_PFJET_HF_HADRON_MULTIPLICTY, "RECO_PFJET_HF_HADRON_MULTIPLICTY[200]/I");
+    Tree_->Branch("RECO_PFJET_HF_EM_MULTIPLICITY", RECO_PFJET_HF_EM_MULTIPLICITY, "RECO_PFJET_HF_EM_MULTIPLICITY[200]/I");
+    Tree_->Branch("RECO_PFJET_CHARGED_MULTIPLICITY", RECO_PFJET_CHARGED_MULTIPLICITY, "RECO_PFJET_CHARGED_MULTIPLICITY[200]/I");
+    Tree_->Branch("RECO_PFJET_NEUTRAL_MULTIPLICITY", RECO_PFJET_NEUTRAL_MULTIPLICITY, "RECO_PFJET_NEUTRAL_MULTIPLICITY[200]/I");
+    Tree_->Branch("RECO_PFJET_NCOMPONENTS", RECO_PFJET_NCOMPONENTS, "RECO_PFJET_NCOMPONENTS[200]/I");
+    Tree_->Branch("RECO_PFJET_COMPONENT_PDGID", RECO_PFJET_COMPONENT_PDGID, "RECO_PFJET_COMPONENT_PDGID[200][100]/I");
+    Tree_->Branch("RECO_PFJET_COMPONENT_PT", RECO_PFJET_COMPONENT_PT, "RECO_PFJET_COMPONENT_PT[200][100]/F");
+    Tree_->Branch("RECO_PFJET_COMPONENT_ETA", RECO_PFJET_COMPONENT_ETA, "RECO_PFJET_COMPONENT_ETA[200][100]/F");
+    Tree_->Branch("RECO_PFJET_COMPONENT_PHI", RECO_PFJET_COMPONENT_PHI, "RECO_PFJET_COMPONENT_PHI[200][100]/F");
+    Tree_->Branch("RECO_PFJET_COMPONENT_E", RECO_PFJET_COMPONENT_E, "RECO_PFJET_COMPONENT_E[200][100]/F");
+    Tree_->Branch("RECO_PFJET_COMPONENT_CHARGE", RECO_PFJET_COMPONENT_CHARGE, "RECO_PFJET_COMPONENT_CHARGE[200][100]/F");
+    Tree_->Branch("RECO_PFJET_COMPONENT_TRANSVERSE_MASS", RECO_PFJET_COMPONENT_TRANSVERSE_MASS, "RECO_PFJET_COMPONENT_TRANSVERSE_MASS[200][100]/F");
+    Tree_->Branch("RECO_PFJET_COMPONENT_XVERTEX", RECO_PFJET_COMPONENT_XVERTEX, "RECO_PFJET_COMPONENT_XVERTEX[200][100]/F");
+    Tree_->Branch("RECO_PFJET_COMPONENT_YVERTEX", RECO_PFJET_COMPONENT_YVERTEX, "RECO_PFJET_COMPONENT_YVERTEX[200][100]/F");
+    Tree_->Branch("RECO_PFJET_COMPONENT_ZVERTEX", RECO_PFJET_COMPONENT_ZVERTEX, "RECO_PFJET_COMPONENT_ZVERTEX[200][100]/F");
+    Tree_->Branch("RECO_PFJET_COMPONENT_VERTEX_CHI2", RECO_PFJET_COMPONENT_VERTEX_CHI2, "RECO_PFJET_COMPONENT_VERTEX_CHI2[200][100]/F");
     
     //CaloMET
     Tree_->Branch( "RECO_CALOMET",          &calomet,          "RECO_CALOMET/F");
@@ -1168,8 +1232,20 @@ class HZZ4LeptonsCommonRootTree : public edm::EDAnalyzer {
     Tree_->Branch( "RECO_PFMET_THETA", &pfmet_theta, "RECO_PFMET_THETA/F");
     //Track Corrected MET
     Tree_->Branch( "RECO_TCMET", &tcmet, "RECO_TCMET/F");
-    //Type I correction MET
+    //@Type I correction MET
     Tree_->Branch( "RECO_CORMETMUONS",  &cormetmuons,  "RECO_CORMETMUONS/F");
+    Tree_->Branch( "RECO_PFMET_JetEnUp", &pfmet_JetEnUp, "RECO_PFMET_JetEnUp/F");
+    Tree_->Branch( "RECO_PFMET_JetEnDn", &pfmet_JetEnDn, "RECO_PFMET_JetEnDn/F");
+    Tree_->Branch( "RECO_PFMET_ElectronEnUp", &pfmet_ElectronEnUp, "RECO_PFMET_ElectronEnUp/F");
+    Tree_->Branch( "RECO_PFMET_ElectronEnDn", &pfmet_ElectronEnDn, "RECO_PFMET_ElectronEnDn/F");
+    Tree_->Branch( "RECO_PFMET_MuonEnUp", &pfmet_MuonEnUp, "RECO_PFMET_MuonEnUp/F");
+    Tree_->Branch( "RECO_PFMET_MuonEnDn", &pfmet_MuonEnDn, "RECO_PFMET_MuonEnDn/F");
+    Tree_->Branch( "RECO_PFMET_JetResUp", &pfmet_JetResUp, "RECO_PFMET_JetResUp/F");
+    Tree_->Branch( "RECO_PFMET_JetResDn", &pfmet_JetResDn, "RECO_PFMET_JetResDn/F");
+    Tree_->Branch( "RECO_PFMET_UnclusteredEnUp", &pfmet_UnclusteredEnUp, "RECO_PFMET_UnclusteredEnUp/F");
+    Tree_->Branch( "RECO_PFMET_UnclusteredEnDn", &pfmet_UnclusteredEnDn, "RECO_PFMET_UnclusteredEnDn/F");
+    Tree_->Branch( "RECO_PFMET_PhotonEnUp", &pfmet_PhotonEnUp, "RECO_PFMET_PhotonEnUp/F");
+    Tree_->Branch( "RECO_PFMET_PhotonEnDn", &pfmet_PhotonEnDn, "RECO_PFMET_PhotonEnDn/F");
    
 
     // Btagging jets and discriminators
@@ -1382,6 +1458,17 @@ class HZZ4LeptonsCommonRootTree : public edm::EDAnalyzer {
       }
     }
     
+    //@
+    LHE_PARTON_N = 0;
+    for(int ipartons=0; ipartons<10; ++ipartons){
+      LHE_PARTON_CLEAR[ipartons] = true;
+      LHE_PARTON_PDGID[ipartons] = -999.;
+      LHE_PARTON_PT[ipartons] = -999.;
+      LHE_PARTON_ETA[ipartons] = -999.;
+      LHE_PARTON_PHI[ipartons] = -999.;
+      LHE_PARTON_E[ipartons] = -999.;
+    }
+
     RECO_PFJET_N = 0;
     for (int ijets=0;ijets<200;ijets++) {
       RECO_PFJET_CHARGE[ijets]   = -999.; 
@@ -1391,6 +1478,44 @@ class HZZ4LeptonsCommonRootTree : public edm::EDAnalyzer {
       RECO_PFJET_PHI[ijets] = -999.;
       RECO_PFJET_PUID[ijets] = -999;
       RECO_PFJET_PUID_MVA[ijets] = -999.;
+      //@
+      RECO_PFJET_PT_UncUp[ijets] = -999.;
+      RECO_PFJET_PT_UncDn[ijets] = -999.;
+      RECO_PFJET_AREA[ijets] = -999.;
+      RECO_PFJET_CHARGED_HADRON_ENERGY[ijets] = -999.;
+      RECO_PFJET_NEUTRAL_HADRON_ENERGY[ijets] = -999.;
+      RECO_PFJET_PHOTON_ENERGY[ijets] = -999.;
+      RECO_PFJET_ELECTRON_ENERGY[ijets] = -999.;
+      RECO_PFJET_MUON_ENERGY[ijets] = -999.;
+      RECO_PFJET_HF_HADRON_ENERGY[ijets] = -999.;
+      RECO_PFJET_HF_EM_ENERGY[ijets] = -999.;
+      RECO_PFJET_CHARGED_EM_ENERGY[ijets] = -999.;
+      RECO_PFJET_CHARGED_MU_ENERGY[ijets] = -999.;
+      RECO_PFJET_NEUTRAL_EM_ENERGY[ijets] = -999.;
+      RECO_PFJET_CHARGED_HADRON_MULTIPLICITY[ijets] = -999.;
+      RECO_PFJET_NEUTRAL_HADRON_MULTIPLICITY[ijets] = -999.;
+      RECO_PFJET_PHOTON_MULTIPLICITY[ijets] = -999.;
+      RECO_PFJET_ELECTRON_MULTIPLICITY[ijets] = -999.;
+      RECO_PFJET_MUON_MULTIPLICITY[ijets] = -999.;
+      RECO_PFJET_HF_HADRON_MULTIPLICTY[ijets] = -999.;
+      RECO_PFJET_HF_EM_MULTIPLICITY[ijets] = -999.;
+      RECO_PFJET_CHARGED_MULTIPLICITY[ijets] = -999.;
+      RECO_PFJET_NEUTRAL_MULTIPLICITY[ijets] = -999.;    
+      RECO_PFJET_NCOMPONENTS[ijets] = -999.;
+      RECO_PFJET_PTD[ijets] = -999.;
+      for(int isbj=0; isbj<100; ++isbj){
+        RECO_PFJET_COMPONENT_PDGID[ijets][isbj] = -999.;
+        RECO_PFJET_COMPONENT_PT[ijets][isbj] = -999.;
+        RECO_PFJET_COMPONENT_ETA[ijets][isbj] = -999.;
+        RECO_PFJET_COMPONENT_PHI[ijets][isbj] = -999.;
+        RECO_PFJET_COMPONENT_E[ijets][isbj] = -999.;
+        RECO_PFJET_COMPONENT_CHARGE[ijets][isbj] = -999.;
+        RECO_PFJET_COMPONENT_TRANSVERSE_MASS[ijets][isbj] = -999.;
+        RECO_PFJET_COMPONENT_XVERTEX[ijets][isbj] = -999.;
+        RECO_PFJET_COMPONENT_YVERTEX[ijets][isbj] = -999.;
+        RECO_PFJET_COMPONENT_ZVERTEX[ijets][isbj] = -999.;
+        RECO_PFJET_COMPONENT_VERTEX_CHI2[ijets][isbj] = -999.;
+      }      
     }
     
 /*     calomet=-999.; */
@@ -1408,6 +1533,19 @@ class HZZ4LeptonsCommonRootTree : public edm::EDAnalyzer {
     pfmet_theta=-999.;
     tcmet=-999.;
     cormetmuons=-999.;
+    //@
+    pfmet_JetEnUp = -999.;
+    pfmet_JetEnDn = -999.;
+    pfmet_ElectronEnUp = -999.;
+    pfmet_ElectronEnDn = -999.;
+    pfmet_MuonEnUp = -999.;
+    pfmet_MuonEnDn = -999.;
+    pfmet_JetResUp = -999.;
+    pfmet_JetResDn = -999.;
+    pfmet_UnclusteredEnUp = -999.;
+    pfmet_UnclusteredEnDn = -999.;
+    pfmet_PhotonEnUp = -999.;
+    pfmet_PhotonEnDn = -999.;
     
     BeamSpot_X=-999.;
     BeamSpot_Y=-999.;
@@ -3688,8 +3826,43 @@ mcIter->mother(0)->mother(0)->mother(0)->mother(0)->mother(0)->mother(0)->status
     edm::Handle<edm::View<pat::Muon> > MuCandidates;
     iEvent.getByToken(muonTag_, MuCandidates);
 
-    edm::Handle<edm::ValueMap<float> > corrpterrormumap;
-    iEvent.getByToken(muonCorrPtErrorMapTag_,corrpterrormumap);
+    //edm::Handle<edm::ValueMap<float> > corrpterrormumap;
+    //iEvent.getByToken(muonCorrPtErrorMapTag_,corrpterrormumap);
+
+    //@
+    edm::Handle<edm::View<pat::Muon> > SlimmedMuons;
+    iEvent.getByToken(slimmedMuonsTag_, SlimmedMuons);
+    vector<double> vcorrPt, vcorrPtError;
+    double corrPt=0.,corrPtError=0.;
+    double smearedPt=0., smearedPtError=0.;
+    TLorentzVector p4;
+    for(edm::View<pat::Muon>::const_iterator SlimmedMuonsIter = SlimmedMuons->begin(); SlimmedMuonsIter != SlimmedMuons->end(); ++SlimmedMuonsIter){
+      smearedPt=SlimmedMuonsIter->pt();
+      smearedPtError=SlimmedMuonsIter->muonBestTrack()->ptError();
+      if (SlimmedMuonsIter->muonBestTrackType() == 1 && SlimmedMuonsIter->pt()<=200.){
+	if (isData){
+	  if (SlimmedMuonsIter->pt()>2.0 && fabs(SlimmedMuonsIter->eta())<2.4){
+	    KalmanMuonCalibrator calibrator("DATA_80X_13TeV");
+	    corrPt = calibrator.getCorrectedPt(SlimmedMuonsIter->pt(), SlimmedMuonsIter->eta(), SlimmedMuonsIter->phi(), SlimmedMuonsIter->charge());
+	    corrPtError = corrPt * calibrator.getCorrectedError(corrPt, SlimmedMuonsIter->eta(), SlimmedMuonsIter->bestTrack()->ptError()/corrPt );
+	    smearedPt=corrPt; // no smearing on data
+	    smearedPtError=corrPtError; // no smearing on data
+	  }
+	}
+	else { // isMC - calibration from data + smearing
+	  KalmanMuonCalibrator calibrator("MC_80X_13TeV");
+	  corrPt = calibrator.getCorrectedPt(SlimmedMuonsIter->pt(), SlimmedMuonsIter->eta(), SlimmedMuonsIter->phi(), SlimmedMuonsIter->charge());
+	  corrPtError = corrPt * calibrator.getCorrectedError(corrPt, SlimmedMuonsIter->eta(), SlimmedMuonsIter->bestTrack()->ptError()/corrPt );
+	  // smearedPt = calibrator.smearForSync(corrPt, SlimmedMuonsIter->eta()); // for synchronization
+	  smearedPt = calibrator.smear(corrPt, SlimmedMuonsIter->eta());
+	  smearedPtError = corrPtError;
+	  //smearedPt * calibrator.getCorrectedErrorAfterSmearing(smearedPt, SlimmedMuonsIter->eta(), corrPtError /smearedPt );
+	}
+      }
+      vcorrPt.push_back(smearedPt);
+      vcorrPtError.push_back(smearedPtError);
+    }
+    
     
     // Particle Flow Isolation
 /*
@@ -3773,9 +3946,9 @@ mcIter->mother(0)->mother(0)->mother(0)->mother(0)->mother(0)->mother(0)->status
       }
     }
     
-    //pVertex = math::XYZPoint(                                                                                                                                                    
-    //			     PV.at(2).position().x(),                                                                                                                       
-    //			     PV.at(2).position().y(),                                                                                                                               
+    //pVertex = math::XYZPoint(                                                                                                         
+    //			     PV.at(2).position().x(),                                                                                   
+    //			     PV.at(2).position().y(),                                                                                   
     //			     PV.at(2).position().z());                            
 
     int indexbis=0;
@@ -3800,18 +3973,32 @@ mcIter->mother(0)->mother(0)->mother(0)->mother(0)->mother(0)->mother(0)->status
     for (edm::View<pat::Muon>::const_iterator cand = MuCandidates->begin(); cand != MuCandidates->end(); ++cand) {
             
       if(indexbis>99) break;
+
+      //@ finds the pt error
+      double calibratorPtError = 0;
+      unsigned int NslimmedMuons = vcorrPt.size();
+      cout << ">>>>> NslimmedMuons = " << NslimmedMuons << "NMuCandidates = " << MuCandidates->size() << endl;
+      for(unsigned int iref=0; iref<NslimmedMuons; ++iref){
+	if(vcorrPt.at(iref) == cand->pt()){
+	  calibratorPtError = vcorrPtError.at(iref);
+	  cout<< "MuCandPt = " << cand->pt() << ", calibratorPt = " << vcorrPt.at(iref) << ", calibratorPtError = " << vcorrPtError.at(iref) << endl;
+	}
+      }      
       
-      edm::Ref<edm::View<pat::Muon> > mutrackref(MuCandidates,indexbis); 
+      //edm::Ref<edm::View<pat::Muon> > mutrackref(MuCandidates,indexbis); 
       edm::Ref<edm::View<pat::Muon> > mutrackrefv(VertMuCandidates,indexbis); 
      
+      
       RECOMU_isPFMu[indexbis]=cand->isPFMuon();
 
+      
       RECOMU_isGlobalMu[indexbis]=cand->isGlobalMuon();
       RECOMU_isStandAloneMu[indexbis]=cand->isStandAloneMuon();
       RECOMU_isTrackerMu[indexbis]=cand->isTrackerMuon();
       RECOMU_isCaloMu[indexbis]=cand->isCaloMuon();
-      RECOMU_isTrackerHighPtMu[indexbis]=isTrackerHighPtMu(*cand,pVertex);   
-
+      //RECOMU_isTrackerHighPtMu[indexbis]=isTrackerHighPtMu(*cand,pVertex);   
+      
+      
       std::cout << "\n Muon in the event: "
 	        <<   "  isPF=" << RECOMU_isPFMu[indexbis]
 		<<   "  isGB=" << RECOMU_isGlobalMu[indexbis]
@@ -3820,6 +4007,7 @@ mcIter->mother(0)->mother(0)->mother(0)->mother(0)->mother(0)->mother(0)->status
 		<< "  isCalo=" << RECOMU_isCaloMu[indexbis]
 		<< std::endl;
 
+      
       // Kinematic of muon
       RECOMU_E[indexbis]=cand->p4().energy();
       RECOMU_PT[indexbis]=cand->p4().pt();
@@ -3843,6 +4031,7 @@ mcIter->mother(0)->mother(0)->mother(0)->mother(0)->mother(0)->mother(0)->status
 	
       // Covariance matrix
       
+      
       if(cand->innerTrack().isAvailable()){
 
 	GlobalTrajectoryParameters gp(GlobalPoint(cand->innerTrack()->vx(), cand->innerTrack()->vy(),  cand->innerTrack()->vz()),
@@ -3861,6 +4050,7 @@ mcIter->mother(0)->mother(0)->mother(0)->mother(0)->mother(0)->mother(0)->status
 	}  
 	
       }
+      
 
       // Isolation
       //      RECOMU_TRACKISO[indexbis]=(*isoTkmumap)[mutrackref]/cand->p4().pt();
@@ -3903,8 +4093,7 @@ mcIter->mother(0)->mother(0)->mother(0)->mother(0)->mother(0)->mother(0)->status
 	if (fabs(RECOMU_ETA[indexbis]) >= 2.3 )                                     EffectiveArea = 0.660;
       }
        
-      RECOMU_PFX_rho[indexbis]=(RECOMU_PFchHad[indexbis]+max( (RECOMU_PFneuHad[indexbis]+RECOMU_PFphoton[indexbis]-max(RHO_mu,0.0)*(EffectiveArea)),0.0) 
-)/double(cand->p4().pt());
+      RECOMU_PFX_rho[indexbis]=(RECOMU_PFchHad[indexbis]+max( (RECOMU_PFneuHad[indexbis]+RECOMU_PFphoton[indexbis]-max(RHO_mu,0.0)*(EffectiveArea)),0.0) )/double(cand->p4().pt());
 
 
       std::cout << "--isolation: muon"
@@ -3922,15 +4111,19 @@ mcIter->mother(0)->mother(0)->mother(0)->mother(0)->mother(0)->mother(0)->status
                 << "  PFX_dB="  << RECOMU_PFX_dB[indexbis] 
                 << "  PFX_rho=" << RECOMU_PFX_rho[indexbis]
 		<< std::endl;
+      
 
       // Vertexing
 
       //Float_t mySIP = cand->userFloat("SIP");
       //Float_t mySIP = std::abs(cand->dB(pat::Muon::PV3D))/cand->edB(pat::Muon::PV3D);;
       //cout << "mySIP= " <<  mySIP << endl;
+
       RECOMU_SIP[indexbis]=(*vertexmumap)[mutrackrefv];
       RECOMU_IP[indexbis]=(*vertexmumapvalue)[mutrackrefv];
       RECOMU_IPERROR[indexbis]=(*vertexmumaperror)[mutrackrefv];
+      
+      
 /*
       RECOMU_SIP_KF[indexbis]=(*vertexmumapKF)[mutrackrefv];
       RECOMU_IP_KF[indexbis]=(*vertexmumapvalueKF)[mutrackrefv];
@@ -3944,15 +4137,16 @@ mcIter->mother(0)->mother(0)->mother(0)->mother(0)->mother(0)->mother(0)->status
       //RECOMU_SIP_Kin[indexbis]=(*vertexmumapKin)[mutrackrefv];
       //if (decaychannel=="4mu" || decaychannel=="2e2mu" ) RECOMU_SIP_KinMMMM[indexbis]=(*vertexmumapKinMMMM)[mutrackrefv];
 
-/*
+      /*
       RECOMU_STIP[indexbis]=(*stipmumap)[mutrackrefv];
       RECOMU_SLIP[indexbis]=(*slipmumap)[mutrackrefv];
       RECOMU_TIP[indexbis]=(*stipmumapvalue)[mutrackrefv];
       RECOMU_LIP[indexbis]=(*slipmumapvalue)[mutrackrefv];
       RECOMU_TIPERROR[indexbis]=(*stipmumaperror)[mutrackrefv];
       RECOMU_LIPERROR[indexbis]=(*slipmumaperror)[mutrackrefv];
-*/      
+      */
 
+      
       std::cout << "--vertexing: muon"
 		<< "  Sign3DIP=" << RECOMU_SIP[indexbis]
 		<< "  3DIP="     << RECOMU_IP[indexbis]
@@ -3980,7 +4174,8 @@ mcIter->mother(0)->mother(0)->mother(0)->mother(0)->mother(0)->mother(0)->status
 	        << "  glbmuPromptTight=" << RECOMU_glbmuPromptTight[indexbis]
 		<< std::endl;
 
-  
+
+      
       // Track properties
       if(cand->muonBestTrack().isAvailable()){
 	RECOMU_mubesttrkType[indexbis]=cand->muonBestTrackType();
@@ -3992,8 +4187,10 @@ mcIter->mother(0)->mother(0)->mother(0)->mother(0)->mother(0)->mother(0)->status
 	RECOMU_mubesttrkDzError[indexbis]=cand->muonBestTrack()->dzError();
 	//RECOMU_mubesttrkPTError[indexbis]=(*corrpterrormumap)[mutrackref];;
       }
-
-      if(cand->globalTrack().isAvailable()){
+      //@
+      RECOMU_mubesttrkPTError[indexbis]=calibratorPtError;
+      
+	if(cand->globalTrack().isAvailable()){
 	RECOMU_mutrkPT[indexbis]=cand->globalTrack()->pt();
 	RECOMU_mutrkPTError[indexbis]=cand->globalTrack()->ptError();
 	//RECOMU_mutrkPTError[indexbis]=cand->bestTrack()->ptError(); // bestTrack
@@ -4011,22 +4208,26 @@ mcIter->mother(0)->mother(0)->mother(0)->mother(0)->mother(0)->mother(0)->status
 	RECOMU_mutrkNMuonHits[indexbis]=cand->globalTrack()->hitPattern().numberOfValidMuonHits(); 
 	RECOMU_mutrktrackerLayersWithMeasurement[indexbis]=cand->globalTrack()->hitPattern().trackerLayersWithMeasurement(); 
 
-	RECOMU_muInnertrkDxy[indexbis]=cand->innerTrack()->dxy(pVertex);
-	RECOMU_muInnertrkDxyError[indexbis]=cand->innerTrack()->dxyError();
-	RECOMU_muInnertrkDxyB[indexbis]=cand->innerTrack()->dxy(bs.position()) ;
-	RECOMU_muInnertrkDz[indexbis]=cand->innerTrack()->dz(pVertex);
-	RECOMU_muInnertrkDzError[indexbis]=cand->innerTrack()->dzError();
-	RECOMU_muInnertrkDzB[indexbis]=cand->innerTrack()->dz(bs.position());
-	RECOMU_muInnertrkChi2PerNdof[indexbis]=cand->innerTrack()->normalizedChi2();
-	RECOMU_muInnertrktrackerLayersWithMeasurement[indexbis]=cand->innerTrack()->hitPattern().trackerLayersWithMeasurement(); 
-	RECOMU_muInnertrkPT[indexbis]=cand->innerTrack()->pt();	
-	//RECOMU_muInnertrkPTError[indexbis]=cand->innerTrack()->ptError();
-	RECOMU_muInnertrkPTError[indexbis]=cand->bestTrack()->ptError(); // Besttrack
-
-	RECOMU_muInnertrkCharge[indexbis]=cand->innerTrack()->charge();
- 	RECOMU_muInnertrkNHits[indexbis]=cand->innerTrack()->numberOfValidHits(); 
-	RECOMU_muInnertrkNPixHits[indexbis]=cand->innerTrack()->hitPattern().numberOfValidPixelHits();
-        RECOMU_muInnertrkNStripHits[indexbis]=cand->innerTrack()->hitPattern().numberOfValidStripHits();
+	
+	if (cand->innerTrack().isAvailable()){
+	  RECOMU_muInnertrkDxy[indexbis]=cand->innerTrack()->dxy(pVertex);
+	  RECOMU_muInnertrkDxyError[indexbis]=cand->innerTrack()->dxyError();
+	  RECOMU_muInnertrkDxyB[indexbis]=cand->innerTrack()->dxy(bs.position()) ;
+	  RECOMU_muInnertrkDz[indexbis]=cand->innerTrack()->dz(pVertex);
+	  RECOMU_muInnertrkDzError[indexbis]=cand->innerTrack()->dzError();
+	  RECOMU_muInnertrkDzB[indexbis]=cand->innerTrack()->dz(bs.position());
+	  RECOMU_muInnertrkChi2PerNdof[indexbis]=cand->innerTrack()->normalizedChi2();
+	  RECOMU_muInnertrktrackerLayersWithMeasurement[indexbis]=cand->innerTrack()->hitPattern().trackerLayersWithMeasurement(); 
+	  RECOMU_muInnertrkPT[indexbis]=cand->innerTrack()->pt();	
+	  //RECOMU_muInnertrkPTError[indexbis]=cand->innerTrack()->ptError();
+	  if (cand->muonBestTrack().isAvailable()) RECOMU_muInnertrkPTError[indexbis]=cand->bestTrack()->ptError(); // Besttrack
+	  
+	  RECOMU_muInnertrkCharge[indexbis]=cand->innerTrack()->charge();
+	  RECOMU_muInnertrkNHits[indexbis]=cand->innerTrack()->numberOfValidHits(); 
+	  RECOMU_muInnertrkNPixHits[indexbis]=cand->innerTrack()->hitPattern().numberOfValidPixelHits();
+	  RECOMU_muInnertrkNStripHits[indexbis]=cand->innerTrack()->hitPattern().numberOfValidStripHits();
+	}
+	
 
       }
       else if(cand->innerTrack().isAvailable()){
@@ -4040,12 +4241,13 @@ mcIter->mother(0)->mother(0)->mother(0)->mother(0)->mother(0)->mother(0)->status
 	RECOMU_muInnertrktrackerLayersWithMeasurement[indexbis]=cand->innerTrack()->hitPattern().trackerLayersWithMeasurement(); 
 	RECOMU_muInnertrkPT[indexbis]=cand->innerTrack()->pt();	
 	//RECOMU_muInnertrkPTError[indexbis]=cand->innerTrack()->ptError();
-	RECOMU_muInnertrkPTError[indexbis]=cand->bestTrack()->ptError(); // Besttrack
+	if (cand->muonBestTrack().isAvailable()) RECOMU_muInnertrkPTError[indexbis]=cand->bestTrack()->ptError(); // Besttrack
 	RECOMU_muInnertrkCharge[indexbis]=cand->innerTrack()->charge();
  	RECOMU_muInnertrkNHits[indexbis]=cand->innerTrack()->numberOfValidHits(); 
 	RECOMU_muInnertrkNPixHits[indexbis]=cand->innerTrack()->hitPattern().numberOfValidPixelHits();
         RECOMU_muInnertrkNStripHits[indexbis]=cand->innerTrack()->hitPattern().numberOfValidStripHits();
       }
+    
 
       if(cand->globalTrack().isAvailable() || cand->innerTrack().isAvailable() ){
 	std::cout << "--muon track properties: "
@@ -4098,7 +4300,9 @@ mcIter->mother(0)->mother(0)->mother(0)->mother(0)->mother(0)->mother(0)->status
 		  << "  LastStationOptLowptLoose=" << RECOMU_trkmuLastStationOptimizedLowPtLoose[indexbis]
 		  << "  LastStationOptLowptTight=" << RECOMU_trkmuLastStationOptimizedLowPtTight[indexbis]
 		  << std::endl;
-      }
+	
+     } 
+	
   
 /*    
       // Matching
@@ -4348,6 +4552,19 @@ void fillTracks(const edm::Event& iEvent){
       pfmet_phi   = i->uncorPhi();
       pfmet_theta = i->uncorP3().theta();
       //std::cout<<"met uncer"<< i->MET::METUncertainty(0) <<endl;
+      
+      pfmet_JetEnUp         = i->shiftedPt(pat::MET::JetEnUp, pat::MET::Type1);
+      pfmet_JetEnDn         = i->shiftedPt(pat::MET::JetEnDown, pat::MET::Type1);
+      pfmet_ElectronEnUp    = i->shiftedPt(pat::MET::ElectronEnUp, pat::MET::Type1);
+      pfmet_ElectronEnDn    = i->shiftedPt(pat::MET::ElectronEnDown, pat::MET::Type1);
+      pfmet_MuonEnUp        = i->shiftedPt(pat::MET::MuonEnUp, pat::MET::Type1);
+      pfmet_MuonEnDn        = i->shiftedPt(pat::MET::MuonEnDown, pat::MET::Type1);
+      pfmet_JetResUp        = i->shiftedPt(pat::MET::JetResUp, pat::MET::Type1);
+      pfmet_JetResDn        = i->shiftedPt(pat::MET::JetResDown, pat::MET::Type1);
+      pfmet_UnclusteredEnUp = i->shiftedPt(pat::MET::UnclusteredEnUp, pat::MET::Type1);
+      pfmet_UnclusteredEnDn = i->shiftedPt(pat::MET::UnclusteredEnDown, pat::MET::Type1);
+      pfmet_PhotonEnUp      = i->shiftedPt(pat::MET::PhotonEnUp, pat::MET::Type1);
+      pfmet_PhotonEnDn      = i->shiftedPt(pat::MET::PhotonEnDown, pat::MET::Type1);      
     }
 
 
@@ -4910,8 +5127,15 @@ void fillTracks(const edm::Event& iEvent){
 
   
   		      
-  void filljets(const edm::Event& iEvent){
+  void filljets(const edm::Event& iEvent, const edm::EventSetup& iSetup){
     edm::Handle<pat::JetCollection> pfjets,pfjetsmva;
+
+    //@ To retrieve JEC Uncertainty
+    edm::ESHandle<JetCorrectorParametersCollection> JetCorParColl;
+    iSetup.get<JetCorrectionsRecord>().get("AK4PFchs",JetCorParColl);//slimmedJets are ak4PFJetsCHS
+    JetCorrectorParameters const & JetCorPar = (*JetCorParColl)["Uncertainty"];
+    JetCorrectionUncertainty *jecUnc = new JetCorrectionUncertainty(JetCorPar);
+    
 
    iEvent.getByToken(jetsTag_, pfjets);
    iEvent.getByToken(jetsMVATag_, pfjetsmva);
@@ -4982,6 +5206,78 @@ void fillTracks(const edm::Event& iEvent){
       RECO_PFJET_PHI[index_jets]    = i->phi();
       RECO_PFJET_PUID[index_jets]     = pupass;
       RECO_PFJET_PUID_MVA[index_jets] = mva;
+      //@
+      jecUnc->setJetEta( i->eta() );
+      jecUnc->setJetPt( i->pt() ); // here you must use the CORRECTED jet pt
+      double unc = jecUnc->getUncertainty(true);
+      RECO_PFJET_PT_UncUp[index_jets] = i->pt() + unc;
+      RECO_PFJET_PT_UncDn[index_jets] = i->pt() - unc;
+      RECO_PFJET_AREA[index_jets] = i->jetArea();
+      RECO_PFJET_CHARGED_HADRON_ENERGY[index_jets] = i->chargedHadronEnergy();
+      RECO_PFJET_NEUTRAL_HADRON_ENERGY[index_jets] = i->neutralHadronEnergy();
+      RECO_PFJET_PHOTON_ENERGY[index_jets] = i->photonEnergy();
+      RECO_PFJET_ELECTRON_ENERGY[index_jets] = i->electronEnergy();
+      RECO_PFJET_MUON_ENERGY[index_jets] = i->muonEnergy();
+      RECO_PFJET_HF_HADRON_ENERGY[index_jets] = i->HFHadronEnergy();
+      RECO_PFJET_HF_EM_ENERGY[index_jets] = i->HFEMEnergy();
+      RECO_PFJET_CHARGED_EM_ENERGY[index_jets] = i->chargedEmEnergy();
+      RECO_PFJET_CHARGED_MU_ENERGY[index_jets] = i->chargedMuEnergy();
+      RECO_PFJET_NEUTRAL_EM_ENERGY[index_jets] = i->neutralEmEnergy();
+      RECO_PFJET_CHARGED_HADRON_MULTIPLICITY[index_jets] = i->chargedHadronMultiplicity();
+      RECO_PFJET_NEUTRAL_HADRON_MULTIPLICITY[index_jets] = i->neutralHadronMultiplicity();
+      RECO_PFJET_PHOTON_MULTIPLICITY[index_jets] = i->photonMultiplicity();
+      RECO_PFJET_ELECTRON_MULTIPLICITY[index_jets] = i->electronMultiplicity();
+      RECO_PFJET_MUON_MULTIPLICITY[index_jets] = i->muonMultiplicity();
+      RECO_PFJET_HF_HADRON_MULTIPLICTY[index_jets] = i->HFHadronMultiplicity();
+      RECO_PFJET_HF_EM_MULTIPLICITY[index_jets] = i->HFEMMultiplicity();
+      RECO_PFJET_CHARGED_MULTIPLICITY[index_jets] = i->chargedMultiplicity();
+      RECO_PFJET_NEUTRAL_MULTIPLICITY[index_jets] = i->neutralMultiplicity();
+      //Stores jet components (jet substructure)
+      int Ncomponents = i->numberOfDaughters();
+      RECO_PFJET_NCOMPONENTS[index_jets] = Ncomponents;
+      std::vector<float> o_jc_pt, o_jc_eta, o_jc_phi, o_jc_energy, o_jc_charge, o_jc_mt, o_jc_vx, o_jc_vy, o_jc_vz, o_jc_pdgid, o_jc_vchi2;
+      float sumpt = 0, sumpt2 = 0;
+      for(int idau=0; idau<Ncomponents; ++idau){
+        const reco::Candidate *jetComponent = i->daughter(idau);
+        float jetComponentPt = jetComponent->pt();
+        sumpt  += jetComponentPt;
+        sumpt2 += (jetComponentPt*jetComponentPt);
+        o_jc_pt      .push_back( jetComponentPt );
+        o_jc_eta     .push_back( jetComponent->eta() );
+        o_jc_phi     .push_back( jetComponent->phi() );
+        o_jc_energy  .push_back( jetComponent->energy() );
+        o_jc_charge  .push_back( jetComponent->charge() );
+        o_jc_mt      .push_back( jetComponent->mt() );//transverse mass
+        o_jc_vx      .push_back( jetComponent->vx() );
+        o_jc_vy      .push_back( jetComponent->vy() );
+        o_jc_vz      .push_back( jetComponent->vz() );
+        o_jc_pdgid   .push_back( jetComponent->pdgId() );
+        o_jc_vchi2   .push_back( jetComponent->vertexNormalizedChi2() );
+      }      
+      RECO_PFJET_PTD[index_jets] = sqrt(sumpt2)/sumpt;
+
+      //Sort the jet components by pt (to keep thing organized for MVA)
+      for(int i1=0; i1 < Ncomponents; ++i1){
+        float maxpt = -1, ci2 = -1;
+        for(int i2=0; i2 < Ncomponents; ++i2){
+          if(o_jc_pt.at(i2) > maxpt){
+            maxpt = o_jc_pt[i2];
+            ci2 = i2;
+          }
+        }
+        RECO_PFJET_COMPONENT_PDGID[index_jets][i1] = o_jc_pdgid[ci2];
+        RECO_PFJET_COMPONENT_PT[index_jets][i1] = o_jc_pt[ci2];
+        RECO_PFJET_COMPONENT_ETA[index_jets][i1] = o_jc_eta[ci2];
+        RECO_PFJET_COMPONENT_PHI[index_jets][i1] = o_jc_phi[ci2];
+        RECO_PFJET_COMPONENT_E[index_jets][i1] = o_jc_energy[ci2];
+        RECO_PFJET_COMPONENT_CHARGE[index_jets][i1] = o_jc_charge[ci2];
+        RECO_PFJET_COMPONENT_TRANSVERSE_MASS[index_jets][i1] = o_jc_mt[ci2];
+        RECO_PFJET_COMPONENT_XVERTEX[index_jets][i1] = o_jc_vx[ci2];
+        RECO_PFJET_COMPONENT_YVERTEX[index_jets][i1] = o_jc_vy[ci2];
+        RECO_PFJET_COMPONENT_ZVERTEX[index_jets][i1] = o_jc_vz[ci2];
+        RECO_PFJET_COMPONENT_VERTEX_CHI2[index_jets][i1] = o_jc_vchi2[ci2];
+        o_jc_pt[ci2] = -2;
+      }
       
       cout 
 	<< "PF Jet with ET= " << RECO_PFJET_ET[index_jets]   
@@ -4999,6 +5295,48 @@ void fillTracks(const edm::Event& iEvent){
       
       index_jets++;
     } // for loop on PFJets jets
+
+    //@
+    //For Q/G study
+
+    if( fillMCTruth ){
+      //Prepare LHE particles list (only the partons in final state and check if they have DR=0.4 clean)
+      edm::Handle<LHEEventProduct> lheInfo;  
+      iEvent.getByToken(LHE_, lheInfo);
+      std::vector<lhef::HEPEUP::FiveVector> lheParticles = lheInfo->hepeup().PUP;    
+      int NlheParticles = lheParticles.size();
+      int lhep_index = 0;
+      bool lhep_clear = true;
+      TLorentzVector lheParton1, lheParton2;
+      for(int ip1=0; ip1<NlheParticles; ++ip1){
+	int lhep1_pdgid = abs(lheInfo->hepeup().IDUP.at(ip1));
+	int lhep1_state = lheInfo->hepeup().ISTUP.at(ip1);
+        if(lhep1_state == 1 && ((lhep1_pdgid >= 1 && lhep1_pdgid <= 8) || lhep1_pdgid == 21)){
+          lheParton1.SetPxPyPzE(lheParticles[ip1][0],lheParticles[ip1][1],lheParticles[ip1][2],lheParticles[ip1][3]);
+          for(int ip2=0; ip2<NlheParticles; ++ip2){
+	      int lhep2_pdgid = abs(lheInfo->hepeup().IDUP.at(ip2));
+	      int lhep2_state = lheInfo->hepeup().ISTUP.at(ip2);
+            if(ip2 != ip1 && lhep2_state == 1 && ((lhep2_pdgid >= 1 && lhep2_pdgid <= 8) || lhep2_pdgid == 21)){
+              lheParton2.SetPxPyPzE(lheParticles[ip2][0],lheParticles[ip2][1],lheParticles[ip2][2],lheParticles[ip2][3]);
+              //Check parton isolation (is there different partons inside PF Jet (Ak4) radius?)
+              //If so, then the PFJet-Parton matching is of course not the best (we might want to avoid those jets?)
+              //Does this take in account the case of different PFJets matching better to same parton?
+              if( deltaR2(lheParton1.Eta(), lheParton1.Phi(), lheParton2.Eta(), lheParton2.Phi()) < 0.4 ) lhep_clear = false;
+            }
+          }
+          LHE_PARTON_CLEAR[lhep_index] = lhep_clear;
+          LHE_PARTON_PDGID[lhep_index] = lhep1_pdgid;
+	  LHE_PARTON_PT[lhep_index]    = lheParton1.Pt();
+	  LHE_PARTON_ETA[lhep_index]   = lheParton1.Eta();
+	  LHE_PARTON_PHI[lhep_index]   = lheParton1.Phi();
+	  LHE_PARTON_E[lhep_index]     = lheParton1.E();
+	  ++lhep_index;
+        }
+      }
+      LHE_PARTON_N = lhep_index;
+    }
+
+   
     
     edm::Handle<double> rhoHandle;
 
@@ -5645,6 +5983,20 @@ void fillTracks(const edm::Event& iEvent){
   int RECO_PFJET_N, RECO_PFJET_CHARGE[200],RECO_PFJET_PUID[200];
   float RECO_PFJET_ET[200], RECO_PFJET_PT[200], RECO_PFJET_ETA[200], RECO_PFJET_PHI[200],RECO_PFJET_PUID_MVA[200];
   double RHO,RHO_ele,RHO_mu;
+  //@
+  bool isData;
+  edm::EDGetTokenT<edm::View<pat::Muon>> slimmedMuonsTag_;
+  edm::EDGetTokenT<LHEEventProduct> LHE_;
+  bool LHE_PARTON_CLEAR[10];
+  int LHE_PARTON_N, LHE_PARTON_PDGID[10];
+  float LHE_PARTON_PT[10], LHE_PARTON_ETA[10], LHE_PARTON_PHI[10], LHE_PARTON_E[10];
+  int RECO_PFJET_CHARGED_HADRON_MULTIPLICITY[200], RECO_PFJET_NEUTRAL_HADRON_MULTIPLICITY[200], RECO_PFJET_PHOTON_MULTIPLICITY[200], RECO_PFJET_ELECTRON_MULTIPLICITY[200], RECO_PFJET_COMPONENT_PDGID[200][100];
+  int RECO_PFJET_MUON_MULTIPLICITY[200], RECO_PFJET_HF_HADRON_MULTIPLICTY[200], RECO_PFJET_HF_EM_MULTIPLICITY[200], RECO_PFJET_CHARGED_MULTIPLICITY[200], RECO_PFJET_NEUTRAL_MULTIPLICITY[200], RECO_PFJET_NCOMPONENTS[200];
+  float RECO_PFJET_PT_UncUp[200], RECO_PFJET_PT_UncDn[200], RECO_PFJET_AREA[200], RECO_PFJET_CHARGED_HADRON_ENERGY[200], RECO_PFJET_NEUTRAL_HADRON_ENERGY[200], RECO_PFJET_PHOTON_ENERGY[200], RECO_PFJET_ELECTRON_ENERGY[200], RECO_PFJET_PTD[200];
+  float RECO_PFJET_MUON_ENERGY[200], RECO_PFJET_HF_HADRON_ENERGY[200], RECO_PFJET_HF_EM_ENERGY[200], RECO_PFJET_CHARGED_EM_ENERGY[200], RECO_PFJET_CHARGED_MU_ENERGY[200];
+  float RECO_PFJET_NEUTRAL_EM_ENERGY[200], RECO_PFJET_PARTON_DR[200], RECO_PFJET_PARTON_PT[200], RECO_PFJET_PARTON_ETA[200], RECO_PFJET_PARTON_PHI[200];
+  float RECO_PFJET_COMPONENT_PT[200][100], RECO_PFJET_COMPONENT_ETA[200][100], RECO_PFJET_COMPONENT_PHI[200][100], RECO_PFJET_COMPONENT_E[200][100], RECO_PFJET_COMPONENT_TRANSVERSE_MASS[200][100], RECO_PFJET_COMPONENT_CHARGE[200][100];
+  float RECO_PFJET_COMPONENT_XVERTEX[200][100], RECO_PFJET_COMPONENT_YVERTEX[200][100], RECO_PFJET_COMPONENT_ZVERTEX[200][100], RECO_PFJET_COMPONENT_VERTEX_CHI2[200][100];
 
   // GenJET
   float MC_GENJET_PT[100], MC_GENJET_ETA[100], MC_GENJET_PHI[100];
@@ -5654,6 +6006,9 @@ void fillTracks(const edm::Event& iEvent){
   float calomet;
     //calometopt,calometoptnohf,calometoptnohfho,calometoptho,calometnohf,calometnohfho,calometho;       
   float pfmet,pfmet_x,pfmet_y,pfmet_phi,pfmet_theta;
+  //@
+  float pfmet_JetEnUp, pfmet_JetEnDn, pfmet_ElectronEnUp, pfmet_ElectronEnDn, pfmet_MuonEnUp, pfmet_MuonEnDn;
+  float pfmet_JetResUp, pfmet_JetResDn, pfmet_UnclusteredEnUp, pfmet_UnclusteredEnDn, pfmet_PhotonEnUp, pfmet_PhotonEnDn;
 
     //htmetic5,htmetkt4,htmetkt6,htmetsc5,htmetsc7;        
     float tcmet;

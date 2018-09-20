@@ -242,7 +242,8 @@ void HZZ4LeptonsCommonRootTree::analyze(const edm::Event& iEvent, const edm::Eve
   // Fill RECO block in the rootple
   // PF Jets
   cout << "fill jet test" << endl;
-  filljets(iEvent);
+  //@
+  filljets(iEvent, iSetup);
   cout << "fill jet test end" << endl;
 
 //  if (useAdditionalRECO==true) {
