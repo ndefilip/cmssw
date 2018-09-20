@@ -50,6 +50,8 @@
 <use   name="CondFormats/CSCObjects"/>
 <use   name="CondFormats/DTObjects"/>
 <use   name="CondFormats/EcalObjects"/>
+<use   name="JetMETCorrections/Objects"/>
+<use   name="CondFormats/JetMETObjects"/>
 <use   name="Alignment/CommonAlignment"/>
 <use   name="PhysicsTools/PatAlgos"/>
 <use   name="PhysicsTools/CandUtils"/>
